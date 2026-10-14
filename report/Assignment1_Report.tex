@@ -104,15 +104,28 @@ The three languages differ fundamentally in how they execute code:
 
 Each implementation uses the same \texttt{ijk} triple-loop order and 64-bit
 floating-point arithmetic (\texttt{float} in Python, \texttt{double} in Java and C).
-No optimised library calls are used for the multiplication itself. Storage is row-major
-in all three cases.
+No optimised library calls are used for the multiplication itself. All three
+implementations run on a single thread; no internal library threads are created.
+Storage layout differs across languages: Python uses a list of lists (each inner list
+is a separate heap object); Java uses \texttt{double[][]}, an array of independently
+allocated row arrays; C uses a flat one-dimensional array with index
+$i \cdot n + j$, providing truly contiguous row-major storage.
 
 \needspace{5\baselineskip}
 \subsection*{Correctness}
 
 Before benchmarking, each implementation verifies three test cases: $A \times I = A$
 (identity matrix), $A \times \mathbf{0} = \mathbf{0}$ (zero matrix), and a $2 \times 2$
-product with a known result. All checks passed in all three languages.
+product with a known result ([[1,2],[3,4]] $\times$ [[5,6],[7,8]] = [[19,22],[43,50]]).
+All checks passed in all three languages.
+
+The test inputs are small integers (values 0--8), for which floating-point
+multiply-accumulate operations produce exact results with no rounding error. Exact
+equality (\texttt{==}) is therefore used as the verification criterion. For general
+random floating-point inputs, differences in evaluation order may introduce rounding
+errors bounded by machine epsilon ($\varepsilon \approx 2.2 \times 10^{-16}$ for
+IEEE 754 double precision); these do not affect the benchmarks since correctness is
+only checked on the integer-valued test cases.
 
 \needspace{8\baselineskip}
 \subsection*{Execution environment}
@@ -184,7 +197,26 @@ $n = 1000$ is both the largest attempted and the largest feasible size under the
 1000 & 2.125408 & 0.989217 & 721.430916 \\
 \bottomrule
 \end{tabular}
-\caption{Median runtime (seconds) over 5 repetitions. IQR below 2\% of the median in all cases.}
+\caption{Median runtime (seconds) over 5 repetitions.}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+\textbf{n} & \textbf{C IQR (s)} & \textbf{Java IQR (s)} & \textbf{Python IQR (s)} \\
+\midrule
+10   & $<$0.000001 & 0.000003 & 0.000003  \\
+50   & $<$0.000001 & 0.000095 & 0.000358  \\
+100  & 0.000011   & 0.000008 & 0.000714  \\
+200  & 0.000113   & 0.000067 & 0.015807  \\
+300  & 0.000622   & 0.000248 & 0.026359  \\
+500  & 0.000560   & 0.000559 & 0.380738  \\
+750  & 0.007911   & 0.001647 & 0.958414  \\
+1000 & 0.004509   & 0.051162 & 1.752245  \\
+\bottomrule
+\end{tabular}
+\caption{Interquartile range (IQR) of runtime (seconds) over 5 repetitions per configuration.}
 \end{table}
 
 \begin{figure}[H]
