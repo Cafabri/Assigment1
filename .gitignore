@@ -20,6 +20,13 @@ c/benchmark
 __pycache__/
 *.pyc
 
+# Duplicate/intermediate report files
+report/Assignment1_Report.pdf
+report/Assignment1_Report.html
+
+# Assignment brief (not part of the submission)
+BD_Individual_Assignments_2026_2027.pdf
+
 # OS files
 .DS_Store
 Thumbs.db

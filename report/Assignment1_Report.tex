@@ -35,15 +35,19 @@
 
 \bigskip
 
+\tableofcontents
+\newpage
+
 \section*{Abstract}
 
 This study compares a naive O($n^3$) triple-loop matrix multiplication implemented in
-Python~3.11, Java~21 (JVM with JIT) and C (gcc~16.1.0, \texttt{-O0}) across matrix
+Python~3.11, Java~21 (JVM with JIT) and C (gcc~16.1.0, \texttt{-O2}) across matrix
 sizes from $n = 10$ to $n = 1000$. Runtime grows cubically in all three languages.
-Java achieves the lowest execution time, outperforming C compiled without optimisation
-flags due to JIT compilation. Python is consistently the slowest, reaching approximately
-12~minutes at $n = 1000$. Memory usage scales as O($n^2$) across all implementations.
-Results are scoped to the tested hardware, compiler settings and input sizes.
+C is the fastest implementation at every tested size. Java takes approximately 2$\times$
+as long as C at $n = 1000$; Python reaches approximately 12~minutes at $n = 1000$,
+around 1500$\times$ slower than C. Memory usage scales as O($n^2$) across all
+implementations. Results are scoped to the tested hardware, compiler settings and input
+sizes.
 
 \section{Introduction and Objective}
 
@@ -55,9 +59,10 @@ performance differences across languages clearly visible as $n$ grows.
 naive triple-loop matrix multiplication implemented in Python, Java and C, when each
 language runs in its standard execution environment?
 
-\textbf{Hypothesis:} Runtime will grow cubically for all three implementations. Languages
-closer to the hardware (C, Java) are expected to be faster than an interpreted language
-(Python).
+\textbf{Hypothesis:} Runtime will grow cubically for all three implementations. C,
+compiled with standard optimisation flags, is expected to be the fastest. Java with JIT
+is expected to be close to C. Python, as an interpreted language, is expected to be one
+to two orders of magnitude slower than the compiled implementations.
 
 \section{Background}
 
@@ -73,9 +78,9 @@ The three languages differ fundamentally in how they execute code:
     \item \textbf{Java (JVM):} compiled to bytecode and then JIT-compiled to native
     machine code at runtime. The JIT identifies hot loops and applies optimisations
     automatically after warm-up.
-    \item \textbf{C (gcc \texttt{-O0}):} compiled ahead-of-time to native code without
-    compiler optimisations. Every operation maps directly to machine instructions, but
-    without register allocation, loop scheduling or vectorisation.
+    \item \textbf{C (gcc \texttt{-O2}):} compiled ahead-of-time to native machine code
+    with standard compiler optimisations, including register allocation and instruction
+    scheduling.
 \end{itemize}
 
 \section{Methodology}
@@ -119,7 +124,7 @@ RAM        & 31.8~GB \\
 OS         & Windows 11 Pro \\
 Python     & CPython 3.11.9 — interpreter, no JIT \\
 Java       & OpenJDK 21.0.12 (Microsoft Build) — JIT enabled (default) \\
-C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O0} \\
+C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O2} \\
 \bottomrule
 \end{tabular}
 \caption{Execution environment.}
@@ -156,7 +161,10 @@ budget.
 \subsection*{Runtime}
 
 Table~\ref{tab:runtime} reports the median runtime and Table~\ref{tab:iqr} the IQR for
-all configurations. Figure~\ref{fig:time} shows the growth on a logarithmic scale.
+all configurations. Figure~\ref{fig:time} shows the growth on a log-log scale; dotted
+lines show the cubic model $t \propto n^3$ anchored at each language's smallest
+measurable point. The C result at $n = 10$ is below the timer resolution and is omitted
+from the plots.
 
 \begin{table}[htbp]
 \centering
@@ -165,14 +173,14 @@ all configurations. Figure~\ref{fig:time} shows the growth on a logarithmic scal
 \toprule
 \textbf{n} & \textbf{C (s)} & \textbf{Java (s)} & \textbf{Python (s)} \\
 \midrule
-10   & 0.000002 & 0.000022 & 0.000202    \\
-50   & 0.000229 & 0.000140 & 0.028243    \\
-100  & 0.001786 & 0.000444 & 0.344134    \\
-200  & 0.014107 & 0.003165 & 1.801821    \\
-300  & 0.049343 & 0.013094 & 11.699590   \\
-500  & 0.235239 & 0.085622 & 58.140186   \\
-750  & 0.943930 & 0.365947 & 284.902533  \\
-1000 & 2.125408 & 0.989217 & 721.430916  \\
+10   & $<$0.000001 & 0.000022 & 0.000202    \\
+50   & 0.000035    & 0.000140 & 0.028243    \\
+100  & 0.000309    & 0.000444 & 0.344134    \\
+200  & 0.002731    & 0.003165 & 1.801821    \\
+300  & 0.010202    & 0.013094 & 11.699590   \\
+500  & 0.048281    & 0.085622 & 58.140186   \\
+750  & 0.177874    & 0.365947 & 284.902533  \\
+1000 & 0.480131    & 0.989217 & 721.430916  \\
 \bottomrule
 \end{tabular}
 \caption{Median runtime (seconds) over 5 repetitions per configuration.}
@@ -186,14 +194,13 @@ all configurations. Figure~\ref{fig:time} shows the growth on a logarithmic scal
 \toprule
 \textbf{n} & \textbf{C IQR (s)} & \textbf{Java IQR (s)} & \textbf{Python IQR (s)} \\
 \midrule
-10   & $<$0.000001 & 0.000003 & 0.000003  \\
-50   & $<$0.000001 & 0.000095 & 0.000358  \\
-100  & 0.000011    & 0.000008 & 0.000714  \\
-200  & 0.000113    & 0.000067 & 0.015807  \\
-300  & 0.000622    & 0.000248 & 0.026359  \\
-500  & 0.000560    & 0.000559 & 0.380738  \\
-750  & 0.007911    & 0.001647 & 0.958414  \\
-1000 & 0.004509    & 0.051162 & 1.752245  \\
+50   & 0.000003    & 0.000095 & 0.000358  \\
+100  & 0.000151    & 0.000008 & 0.000714  \\
+200  & 0.000006    & 0.000067 & 0.015807  \\
+300  & 0.000133    & 0.000248 & 0.026359  \\
+500  & 0.000307    & 0.000559 & 0.380738  \\
+750  & 0.000321    & 0.001647 & 0.958414  \\
+1000 & 0.001999    & 0.051162 & 1.752245  \\
 \bottomrule
 \end{tabular}
 \caption{IQR of runtime (seconds) over 5 repetitions per configuration.}
@@ -203,8 +210,19 @@ all configurations. Figure~\ref{fig:time} shows the growth on a logarithmic scal
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{../results/plot_time.png}
-    \caption{Median runtime vs matrix size $n$ (log scale). Error bars show IQR.}
+    \caption{Median runtime vs matrix size $n$ (log-log scale). Dotted lines show the
+    cubic model $t \propto n^3$ anchored at each language's first measurable point.
+    Error bars show IQR.}
     \label{fig:time}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{../results/plot_cost_per_op.png}
+    \caption{Median time divided by $n^3$ (nanoseconds per multiply-add). A flat line
+    indicates perfect cubic scaling; an upward trend reveals when cache pressure makes
+    each operation more expensive.}
+    \label{fig:costperop}
 \end{figure}
 
 \subsection*{Memory}
@@ -230,7 +248,8 @@ all configurations. Figure~\ref{fig:time} shows the growth on a logarithmic scal
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{../results/plot_memory.png}
-    \caption{Memory usage vs matrix size $n$.}
+    \caption{Memory usage vs matrix size $n$ (log-log scale). The dashed line shows the
+    raw storage of three float64 matrices ($3n^2 \times 8$~bytes).}
     \label{fig:memory}
 \end{figure}
 
@@ -239,23 +258,21 @@ all configurations. Figure~\ref{fig:time} shows the growth on a logarithmic scal
 \textbf{Cubic growth.}
 All three implementations exhibit clear cubic growth. From $n = 100$ to $n = 200$
 (factor of 2), runtimes multiply by approximately 8 ($2^3$), consistent with O($n^3$).
-Slight deviations at larger sizes are expected due to cache pressure as the working set
+Figure~\ref{fig:costperop} shows the cost per inner-loop operation (median time divided
+by $n^3$): a flat line would indicate perfect cubic scaling. For all three languages the
+cost per operation rises at large $n$, consistent with cache pressure as the working set
 exceeds the L2/L3 cache.
 
-\textbf{Java faster than C.}
-A notable result is that Java consistently outperforms C. This is explained by the
-difference in execution model: C is compiled with \texttt{-O0}, which disables all
-compiler optimisations, while Java's JVM applies JIT compilation at runtime after the
-warm-up phase. The JIT identifies the hot inner loop and generates optimised native code,
-including efficient register allocation and instruction scheduling. This is not a general
-claim about the languages: C compiled with \texttt{-O2} or \texttt{-O3} would be
-significantly faster than Java. The result reflects the chosen conditions — each language
-in its standard runtime environment, with C intentionally unoptimised to isolate the
-algorithm from compiler transformations. Compiler optimisations will be explored in
-Assignment~2.
+\textbf{C is the fastest.}
+C compiled with \texttt{-O2} is the fastest implementation at every tested size. At
+$n = 1000$, Java takes approximately $2\times$ as long as C, and Python takes
+approximately 1500$\times$ as long. The gap between C and Java is explained by the
+difference in storage layout: Java's \texttt{double[][]} stores each row as a separate
+heap object, so the inner loop accessing column~$j$ of~$B$ must first load a row
+reference, adding an indirection that C's contiguous flat array avoids.
 
 \textbf{Python overhead.}
-Python is approximately 340$\times$ slower than C and 730$\times$ slower than Java at
+Python is approximately 1500$\times$ slower than C and 730$\times$ slower than Java at
 $n = 1000$. CPython interprets each bytecode instruction individually, performs dynamic
 type checks on every operation, and represents numbers as heap-allocated objects.
 These overheads dominate the inner loop and explain the large constant factor relative
@@ -269,21 +286,22 @@ overhead. These metrics should not be compared as if identical.
 
 \textbf{Limitations.}
 Cross-language PRNG differences mean input matrices are statistically similar but not
-bit-identical. The Java memory metric is approximate due to GC activity. Results are
+bit-identical. The Java memory metric is approximate due to GC activity. The C timer
+resolution is insufficient to measure $n = 10$ (result below 1~$\mu$s). Results are
 specific to the tested hardware, OS and language versions.
 
 \section{Conclusions}
 
 All three implementations exhibit the expected O($n^3$) runtime growth. Under the tested
-conditions — each language in its standard execution environment — Java achieves the
-lowest execution time due to JIT compilation, followed by C (\texttt{-O0}), then Python.
-Python's interpreter overhead makes it unsuitable for large-scale naive matrix
-multiplication without vectorised libraries. Memory usage scales quadratically in all
-cases, with differences in absolute values explained by the measurement method.
+conditions — each language in its standard execution environment — C (\texttt{-O2})
+achieves the lowest execution time, followed by Java (JIT), then Python. Python's
+interpreter overhead makes it unsuitable for large-scale naive matrix multiplication
+without vectorised libraries. Memory usage scales quadratically in all cases, with
+differences in absolute values explained by the measurement method.
 
 These conclusions apply strictly to the tested implementation, hardware and settings.
-Compiler optimisations, addressed in Assignment~2, would substantially change the
-relative performance of C.
+Cache blocking, loop reordering and further compiler optimisations will be explored in
+Assignment~2.
 
 \section*{Generative AI Disclosure}
 

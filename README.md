@@ -45,7 +45,7 @@ standard execution environment?
 | RAM | 31.8 GB |
 | Python | CPython 3.11.9 |
 | Java | OpenJDK 21.0.12 (Microsoft Build of OpenJDK with Hotspot) |
-| C compiler | gcc 16.1.0 (MSYS2/MinGW64), flags: `-O0` |
+| C compiler | gcc 16.1.0 (MSYS2/MinGW64), flags: `-O2` |
 | pandas | 2.x (used only for analysis script) |
 | matplotlib | 3.x (used only for analysis script) |
 
@@ -75,12 +75,12 @@ Requires JDK 21 or later.
 
 ```bash
 cd c
-gcc -O0 -o benchmark matmul.c benchmark.c
+gcc -O2 -o benchmark matmul.c benchmark.c
 ./benchmark          # Linux/macOS
 benchmark.exe        # Windows
 ```
 
-Flag `-O0` disables all compiler optimisations. Each implementation runs on a single
+Flag `-O2` enables standard compiler optimisations. Each implementation runs on a single
 thread with no internal library threads.
 
 ## Reproducing the full study
@@ -95,7 +95,7 @@ cd python && python benchmark.py && cd ..
 cd java && javac MatMul.java Benchmark.java && java Benchmark && cd ..
 
 # 3. C
-cd c && gcc -O0 -o benchmark matmul.c benchmark.c && ./benchmark && cd ..
+cd c && gcc -O2 -o benchmark matmul.c benchmark.c && ./benchmark && cd ..
 
 # 4. Generate figures and summary tables
 cd analysis && python plot_results.py
