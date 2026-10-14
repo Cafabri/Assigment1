@@ -67,7 +67,6 @@ def plot_time(summary):
     ax.set_ylabel("Execution time (s, log scale)", fontsize=12)
     ax.set_title("Runtime vs matrix size", fontsize=12)
     ax.legend(fontsize=9)
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
 
     path = os.path.join(FIGURES_DIR, "plot_time.png")
     fig.tight_layout()
@@ -97,7 +96,6 @@ def plot_memory(summary):
     ax.set_ylabel("Memory (KB, log scale)", fontsize=12)
     ax.set_title("Memory usage vs matrix size", fontsize=12)
     ax.legend(fontsize=9)
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
 
     path = os.path.join(FIGURES_DIR, "plot_memory.png")
     fig.tight_layout()
@@ -125,7 +123,6 @@ def plot_cost_per_op(summary):
     ax.set_ylabel("Median time / n³ (ns per multiply-add, log scale)", fontsize=12)
     ax.set_title("Cost per operation — flat line = perfect cubic scaling", fontsize=12)
     ax.legend(fontsize=9)
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
 
     path = os.path.join(FIGURES_DIR, "plot_cost_per_op.png")
     fig.tight_layout()

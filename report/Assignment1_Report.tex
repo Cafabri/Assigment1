@@ -35,9 +35,6 @@
 
 \bigskip
 
-\tableofcontents
-\newpage
-
 \section*{Abstract}
 
 This study compares a naive O($n^3$) triple-loop matrix multiplication implemented in
@@ -209,7 +206,7 @@ from the plots.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{../results/plot_time.png}
+    \includegraphics[width=0.75\textwidth]{../results/plot_time.png}
     \caption{Median runtime vs matrix size $n$ (log-log scale). Dotted lines show the
     cubic model $t \propto n^3$ anchored at each language's first measurable point.
     Error bars show IQR.}
@@ -218,7 +215,7 @@ from the plots.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{../results/plot_cost_per_op.png}
+    \includegraphics[width=0.75\textwidth]{../results/plot_cost_per_op.png}
     \caption{Median time divided by $n^3$ (nanoseconds per multiply-add). A flat line
     indicates perfect cubic scaling; an upward trend reveals when cache pressure makes
     each operation more expensive.}
@@ -247,7 +244,7 @@ from the plots.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{../results/plot_memory.png}
+    \includegraphics[width=0.75\textwidth]{../results/plot_memory.png}
     \caption{Memory usage vs matrix size $n$ (log-log scale). The dashed line shows the
     raw storage of three float64 matrices ($3n^2 \times 8$~bytes).}
     \label{fig:memory}
