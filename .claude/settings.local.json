@@ -4,7 +4,8 @@
       "PowerShell(git *)",
       "PowerShell(git push *)",
       "PowerShell(javac *)",
-      "PowerShell(winget install *)"
+      "PowerShell(winget install *)",
+      "PowerShell(python -c \"import pandas; import matplotlib; print\\('OK'\\)\")"
     ]
   }
 }

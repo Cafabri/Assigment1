@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.Locale;
 import java.util.Random;
 
 public class Benchmark {
@@ -46,8 +47,8 @@ public class Benchmark {
 
                 double dummy = C[0][0]; // prevent dead code elimination
 
-                System.out.printf("  rep %d: %.4fs  %.1f KB%n", rep, elapsed, memUsed / 1024.0);
-                csv.printf("java,%d,%d,%.6f,%d%n", n, rep, elapsed, memUsed);
+                System.out.printf(Locale.US, "  rep %d: %.4fs  %.1f KB%n", rep, elapsed, memUsed / 1024.0);
+                csv.printf(Locale.US, "java,%d,%d,%.6f,%d%n", n, rep, elapsed, memUsed);
             }
         }
 
