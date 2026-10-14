@@ -134,6 +134,13 @@ C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O0} \\
 \caption{Execution environment.}
 \end{table}
 
+\needspace{5\baselineskip}
+\subsection*{Budget}
+
+A maximum runtime of 15~minutes per run and a memory limit of 30~GB were declared before
+testing large sizes. All configurations up to $n = 1000$ completed within these limits.
+$n = 1000$ is both the largest attempted and the largest feasible size under the declared budget.
+
 \needspace{8\baselineskip}
 \subsection*{Measurement protocol}
 
@@ -265,6 +272,35 @@ cases, with differences in absolute values explained by the measurement method.
 These conclusions apply strictly to the tested implementation, hardware, and settings.
 Compiler optimisations (addressed in Assignment~2) would substantially change the
 relative performance of C.
+
+% ─────────────────────────────────────────────
+\needspace{8\baselineskip}
+\section*{Generative AI Disclosure}
+% ─────────────────────────────────────────────
+
+\textbf{Tool:} Claude Code (Claude Sonnet 4.6, Anthropic).
+
+\textbf{Purpose and affected parts:}
+\begin{itemize}
+    \item \textit{Planning and structure} — the four-step experimental plan
+    (implementations, benchmark, analysis, report) was designed with AI assistance.
+    \item \textit{Implementation scaffolding} — the structure of the Python, Java and C
+    benchmark files (timing harness, CSV output, warm-up loop) was generated with AI
+    support and then reviewed and validated by the author.
+    \item \textit{Debugging} — AI assistance was used to identify and fix two issues:
+    the Java locale bug that produced malformed CSV output, and the unavailability of
+    \texttt{timespec\_get} in MinGW, replaced with \texttt{QueryPerformanceCounter}.
+    \item \textit{Analysis script} — the Python plotting script was generated with AI
+    support and reviewed by the author.
+    \item \textit{Report drafting and language revision} — the structure and initial
+    text of this report were produced with AI assistance. All technical claims,
+    measurements and conclusions were verified by the author.
+\end{itemize}
+
+\textbf{Author's responsibility:} The author understands all implementation code,
+validated the correctness checks manually, verified that the raw measurements are
+consistent with the expected O($n^3$) behaviour, and is able to reproduce and defend
+every experiment described in this report.
 
 % ─────────────────────────────────────────────
 \section*{References and Materials}
