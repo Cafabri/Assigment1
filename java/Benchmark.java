@@ -4,7 +4,7 @@ import java.util.Random;
 
 public class Benchmark {
 
-    static final int[] SIZES = {10, 50, 100, 150, 200};
+    static final int[] SIZES = {10, 50, 100, 200, 300, 500, 750, 1000};
     static final int REPETITIONS = 5;
     static final int WARMUP_RUNS = 3;
     static final long SEED = 42;

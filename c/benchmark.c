@@ -8,8 +8,8 @@
 #define REPETITIONS 5
 #define WARMUP_RUNS 2
 
-static const int SIZES[]   = {10, 50, 100, 150, 200};
-static const int NUM_SIZES = 5;
+static const int SIZES[]   = {10, 50, 100, 200, 300, 500, 750, 1000};
+static const int NUM_SIZES = 8;
 
 static double *alloc_matrix(int n) {
     double *M = calloc(n * n, sizeof(double));

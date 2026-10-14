@@ -5,7 +5,7 @@ import csv
 import os
 from matmul import multiply, check_correctness
 
-SIZES = [10, 50, 100, 150, 200]
+SIZES = [10, 50, 100, 200, 300, 500, 750, 1000]
 REPETITIONS = 5
 WARMUP_RUNS = 1
 SEED = 42
