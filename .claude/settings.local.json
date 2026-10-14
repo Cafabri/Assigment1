@@ -3,7 +3,8 @@
     "allow": [
       "PowerShell(git *)",
       "PowerShell(git push *)",
-      "PowerShell(javac *)"
+      "PowerShell(javac *)",
+      "PowerShell(winget install *)"
     ]
   }
 }
