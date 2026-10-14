@@ -1,0 +1,25 @@
+# Claude Code local config
+.claude/
+
+# Java compiled files
+*.class
+
+# C compiled binaries
+*.exe
+*.o
+c/benchmark
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
