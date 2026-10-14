@@ -8,8 +8,14 @@
 \usepackage{microtype}
 \usepackage{caption}
 \usepackage{float}
+\usepackage{needspace}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+
+% Prevent orphan/widow lines and headers stranded at page bottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{1.5em}
 
 \hypersetup{
     colorlinks=true,
@@ -93,6 +99,7 @@ The three languages differ fundamentally in how they execute code:
 \section{Methodology}
 % ─────────────────────────────────────────────
 
+\needspace{5\baselineskip}
 \subsection*{Implementations}
 
 Each implementation uses the same \texttt{ijk} triple-loop order and 64-bit
@@ -100,12 +107,14 @@ floating-point arithmetic (\texttt{float} in Python, \texttt{double} in Java and
 No optimised library calls are used for the multiplication itself. Storage is row-major
 in all three cases.
 
+\needspace{5\baselineskip}
 \subsection*{Correctness}
 
 Before benchmarking, each implementation verifies three test cases: $A \times I = A$
 (identity matrix), $A \times \mathbf{0} = \mathbf{0}$ (zero matrix), and a $2 \times 2$
 product with a known result. All checks passed in all three languages.
 
+\needspace{8\baselineskip}
 \subsection*{Execution environment}
 
 \begin{table}[H]
@@ -125,6 +134,7 @@ C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O0} \\
 \caption{Execution environment.}
 \end{table}
 
+\needspace{8\baselineskip}
 \subsection*{Measurement protocol}
 
 \begin{itemize}
@@ -134,10 +144,9 @@ C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O0} \\
     \item \textbf{Timing:} \texttt{perf\_counter} (Python), \texttt{nanoTime} (Java),
     \texttt{QueryPerformanceCounter} (C). All timers measure wall-clock time of the
     multiplication kernel only; input generation is outside the timed region.
-    \item \textbf{Memory:} peak heap via \texttt{tracemalloc} (Python); heap delta via
-    \texttt{Runtime.totalMemory() $-$ freeMemory()} after \texttt{gc()} (Java);
-    allocated matrix storage $3n^2 \times 8$~bytes (C — exact, since allocation
-    is explicit).
+    \item \textbf{Memory:} peak heap via \texttt{tracemalloc} (Python); JVM heap
+    delta before and after \texttt{gc()} (Java); allocated matrix storage
+    $3n^2 \times 8$~bytes (C — exact, since allocation is explicit).
     \item \textbf{Summary statistic:} median and interquartile range (IQR) over 5
     repetitions.
     \item \textbf{Inputs:} matrices generated with fixed seeds (42 for A, 43 for B)
@@ -149,6 +158,7 @@ C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O0} \\
 \section{Results}
 % ─────────────────────────────────────────────
 
+\needspace{8\baselineskip}
 \subsection*{Runtime}
 
 \begin{table}[H]
@@ -176,6 +186,7 @@ C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O0} \\
     \caption{Median runtime vs matrix size $n$ (log scale). Error bars show IQR.}
 \end{figure}
 
+\needspace{8\baselineskip}
 \subsection*{Memory}
 
 \begin{table}[H]
