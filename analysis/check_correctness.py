@@ -83,11 +83,13 @@ def check_checksums():
         ref = reference(n).sum()
         d = raw[raw["n"] == n]
         for lang in ["c", "java", "python"]:
-            values = d[d["language"] == lang]["checksum"].unique()
+            # batched runs have no checksum: theirs comes from the separate "check" call
+            sums = d[d["language"] == lang]["checksum"].dropna()
+            values = sums.unique()
             if len(values) == 0:
                 continue
             rel = np.abs(values - ref).max() / ref
-            rows.append({"n": n, "language": lang, "runs": int((d["language"] == lang).sum()),
+            rows.append({"n": n, "language": lang, "runs": len(sums),
                          "distinct_checksums": len(values), "checksum": repr(float(values[0])),
                          "numpy_checksum": repr(float(ref)), "rel_diff_vs_numpy": rel,
                          "passed": bool(rel <= RTOL)})
