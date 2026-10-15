@@ -1,0 +1,9 @@
+test,n,language,max_abs_error,max_rel_error,tolerance,passed
+random vs NumPy,50,c,4.547473508864641e-13,4.0927062253465917e-16,rtol=1e-11,True
+random vs NumPy,50,java,4.547473508864641e-13,4.0927062253465917e-16,rtol=1e-11,True
+random vs NumPy,50,python,4.547473508864641e-13,4.0927062253465917e-16,rtol=1e-11,True
+C = Java = Python (bitwise),50,all,0.0,,exact,True
+random vs NumPy,257,c,1.1823431123048067e-11,1.9349570083266035e-15,rtol=1e-11,True
+random vs NumPy,257,java,1.1823431123048067e-11,1.9349570083266035e-15,rtol=1e-11,True
+random vs NumPy,257,python,1.1823431123048067e-11,1.9349570083266035e-15,rtol=1e-11,True
+C = Java = Python (bitwise),257,all,0.0,,exact,True

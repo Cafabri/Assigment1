@@ -1,3 +1,6 @@
+import sys
+
+
 def multiply(A, B):
     n = len(A)
     C = [[0.0] * n for _ in range(n)]
@@ -26,7 +29,7 @@ def check_correctness():
     result = multiply(A, B)
     assert result == expected, f"Known result test failed: {result}"
 
-    print("All correctness checks passed.")
+    print("All correctness checks passed.", file=sys.stderr)
 
 
 if __name__ == "__main__":

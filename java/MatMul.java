@@ -31,6 +31,6 @@ public class MatMul {
         if (result[0][0] != 19 || result[0][1] != 22 || result[1][0] != 43 || result[1][1] != 50)
             throw new RuntimeException("Known result test failed");
 
-        System.out.println("All correctness checks passed.");
+        System.err.println("All correctness checks passed.");
     }
 }
