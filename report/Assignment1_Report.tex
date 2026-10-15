@@ -3,17 +3,34 @@
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{cite}
 \usepackage{hyperref}
 \usepackage{parskip}
 \usepackage{microtype}
 \usepackage{caption}
+\usepackage{float}
+\usepackage{array}
+\usepackage{placeins}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage[nobottomtitles*]{titlesec}
+\usepackage{etoolbox}
 
 \widowpenalty=10000
 \clubpenalty=10000
 \setlength{\emergencystretch}{1.5em}
+
+% Start a new page before a heading when fewer than #1 lines are left, so a
+% heading is never left at the bottom of a page with only a few lines under it.
+\makeatletter
+\newcommand{\needlines}[1]{\par\begingroup
+  \dimen@=#1\baselineskip
+  \dimen@ii=\pagegoal \advance\dimen@ii by -\pagetotal
+  \ifdim\dimen@>\dimen@ii \ifdim\dimen@ii>\z@ \vfil\fi \break \fi
+  \endgroup}
+\makeatother
+\pretocmd{\section}{\needlines{18}}{}{}
+\pretocmd{\subsection}{\needlines{9}}{}{}
 
 \hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=black}
 
@@ -32,198 +49,374 @@
 \maketitle
 \thispagestyle{empty}
 
-\noindent\textbf{Repository:} \url{https://github.com/Cafabri/Assigment1}
+\begin{center}
+\textbf{Repository:} \url{https://github.com/Cafabri/Assigment1}
+\end{center}
 
-\bigskip
+\vspace*{\stretch{1}}
 
-\section*{Abstract}
+\begin{abstract}
+\noindent
+The naive O($n^3$) triple-loop matrix multiplication was implemented in Python~3.11,
+Java~21 and C (gcc~16.1.0, \texttt{-O2}) with the same \texttt{ijk} loop order, 64-bit
+floating point and bit-identical input matrices produced by a common random generator.
+All implementations were validated against NumPy and benchmarked on an Intel Core
+i7-13700KF (Windows~11) for $n = 10$ to $3000$ under a budget of 15~minutes per run,
+with five measured runs after warm-up per configuration. Between $n = 100$ and $1000$
+the runtime grows close to $n^3$ in the three languages (fitted exponents 3.2--3.3);
+beyond $n = 1000$, when the matrices no longer fit in the 30~MB L3 cache, the compiled
+versions grow much faster (exponents 4.6--4.7). C is the fastest at every size. Java
+needs 1.2--2.1 times the C time up to $n = 1000$ and up to 5.4 times at $n = 1500$;
+Python needs 130--175 times the C time up to $n = 1500$. C and Java completed every
+declared size up to $n = 3000$, while Python's largest feasible size was $n = 2000$
+(838~s per run). Memory grows as $n^2$ in all three. These results describe these
+programs on this computer and should not be generalised to the languages as a whole.
+\end{abstract}
 
-This study compares a naive O($n^3$) triple-loop matrix multiplication implemented in
-Python~3.11, Java~21 (JVM with JIT) and C (gcc~16.1.0, \texttt{-O2}) across matrix
-sizes from $n = 10$ to $n = 1000$. Runtime grows cubically in all three languages.
-C is the fastest implementation at every tested size. Java takes approximately 2$\times$
-as long as C at $n = 1000$; Python reaches approximately 12~minutes at $n = 1000$,
-around 1500$\times$ slower than C. Memory usage scales as O($n^2$) across all
-implementations. Results are scoped to the tested hardware, compiler settings and input
-sizes.
+\vspace*{\stretch{1}}
 
-\section{Introduction and Objective}
+\newpage
 
-Matrix multiplication is a fundamental operation in scientific computing. Its naive
-implementation requires O($n^3$) arithmetic operations for $n \times n$ matrices, making
-performance differences across languages clearly visible as $n$ grows.
+\section{Introduction and objective}
 
-\textbf{Research question:} How does matrix size affect the runtime and memory usage of a
-naive triple-loop matrix multiplication implemented in Python, Java and C, when each
-language runs in its standard execution environment?
+\subsection{Motivation}
 
-\textbf{Hypothesis:} Runtime will grow cubically for all three implementations. C,
-compiled with standard optimisation flags, is expected to be the fastest. Java with JIT
-is expected to be close to C. Python, as an interpreted language, is expected to be one
-to two orders of magnitude slower than the compiled implementations.
+Matrix multiplication appears in almost every numerical and data-processing
+workload~\cite{cormen2009}, and its naive form is short enough to be written in exactly
+the same way in different languages. It is therefore a good test case to see how much
+the execution environment alone (an interpreter, a JIT compiler or an ahead-of-time
+compiler) changes the performance of one fixed algorithm. The measurements obtained here
+are also the baseline for the optimised, parallel and distributed versions of the
+following assignments.
 
-\section{Background}
+\subsection{Research question}
 
-The standard triple-loop algorithm computes $C[i][j] = \sum_k A[i][k] \cdot B[k][j]$
-for all $i$, $j$, performing $n^3$ multiply-accumulate operations. Its theoretical
-complexity is O($n^3$) in time and O($n^2$) in space for the output matrix.
+\begin{center}
+\begin{minipage}{0.88\textwidth}
+\itshape How does matrix size affect the runtime and memory usage of a naive triple-loop
+matrix multiplication implemented in Python, Java and C, when each language runs in its
+standard execution environment?
+\end{minipage}
+\end{center}
 
-The three languages differ fundamentally in how they execute code:
-
-\begin{itemize}
-    \item \textbf{Python (CPython):} interpreted line by line. Each operation involves
-    dynamic type checking and object overhead, making inner loops expensive.
-    \item \textbf{Java (JVM):} compiled to bytecode and then JIT-compiled to native
-    machine code at runtime. The JIT identifies hot loops and applies optimisations
-    automatically after warm-up.
-    \item \textbf{C (gcc \texttt{-O2}):} compiled ahead-of-time to native machine code
-    with standard compiler optimisations, including register allocation and instruction
-    scheduling.
-\end{itemize}
-
-\section{Methodology}
-
-\subsection*{Implementations}
-
-Each implementation uses the same \texttt{ijk} triple-loop order and 64-bit
-floating-point arithmetic (\texttt{float} in Python, \texttt{double} in Java and C).
-No optimised library calls are used for the multiplication itself. All three
-implementations run on a single thread; no internal library threads are created.
-Storage layout differs across languages: Python uses a list of lists (each inner list
-is a separate heap object); Java uses \texttt{double[][]}, an array of independently
-allocated row arrays; C uses a flat one-dimensional array with index $i \cdot n + j$,
-providing truly contiguous row-major storage.
-
-\subsection*{Correctness}
-
-Before benchmarking, each implementation verifies three test cases: $A \times I = A$
-(identity matrix), $A \times \mathbf{0} = \mathbf{0}$ (zero matrix), and a $2 \times 2$
-product with known result ([[1,2],[3,4]] $\times$ [[5,6],[7,8]] = [[19,22],[43,50]]).
-All checks passed in all three languages.
-
-The test inputs use small integers (values 0--8), for which floating-point
-multiply-accumulate operations produce exact results with no rounding error. Exact
-equality (\texttt{==}) is therefore used as the verification criterion. For general
-random floating-point inputs, differences in evaluation order may introduce rounding
-errors bounded by machine epsilon ($\varepsilon \approx 2.2 \times 10^{-16}$ for
-IEEE~754 double precision); these do not affect the benchmarks since correctness is
-verified only on the integer-valued test cases.
-
-\subsection*{Execution environment}
-
-\begin{table}[htbp]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Item} & \textbf{Value} \\
-\midrule
-CPU        & Intel Core i7-13700KF (16 cores, 24 logical processors) \\
-RAM        & 31.8~GB \\
-OS         & Windows 11 Pro \\
-Python     & CPython 3.11.9 — interpreter, no JIT \\
-Java       & OpenJDK 21.0.12 (Microsoft Build) — JIT enabled (default) \\
-C compiler & gcc 16.1.0 (MSYS2/MinGW64), flags: \texttt{-O2} \\
-\bottomrule
-\end{tabular}
-\caption{Execution environment.}
-\end{table}
-
-\subsection*{Budget}
-
-A maximum runtime of 15~minutes per run and a memory limit of 30~GB were declared before
-testing large sizes. All configurations up to $n = 1000$ completed within these limits.
-$n = 1000$ is both the largest attempted and the largest feasible size under the declared
-budget.
-
-\subsection*{Measurement protocol}
+\subsection{Variables}
 
 \begin{itemize}
-    \item \textbf{Sizes tested:} $n \in \{10, 50, 100, 200, 300, 500, 750, 1000\}$.
-    \item \textbf{Repetitions:} 5 measured runs per configuration, preceded by warm-up
-    runs (1 for Python, 3 for Java, 2 for C) to reduce cold-start effects.
-    \item \textbf{Timing:} \texttt{perf\_counter} (Python), \texttt{nanoTime} (Java),
-    \texttt{QueryPerformanceCounter} (C). All timers measure wall-clock time of the
-    multiplication kernel only; input generation is outside the timed region.
-    \item \textbf{Memory:} peak heap via \texttt{tracemalloc} (Python); JVM heap delta
-    before and after \texttt{gc()} (Java); allocated matrix storage $3n^2 \times 8$~bytes
-    (C — exact, since allocation is explicit).
-    \item \textbf{Summary statistic:} median and interquartile range (IQR) over 5
-    repetitions.
-    \item \textbf{Inputs:} matrices generated with fixed seeds (42 for A, 43 for B) using
-    each language's standard PRNG, values in $[0, 10]$. Cross-language PRNGs differ, so
-    matrices are statistically similar but not bit-identical.
+    \item \textbf{Factors varied:} the matrix size $n$ (side of the $n \times n$
+    matrices) and the implementation language.
+    \item \textbf{Outcomes measured:} the execution time of the multiplication kernel and
+    the memory used by each implementation.
+    \item \textbf{Kept fixed:} algorithm and loop order, numeric type (float64), input
+    matrices, machine, compiler and runtime settings, single thread.
 \end{itemize}
 
-\section{Results}
+\subsection{Hypotheses}
 
-\subsection*{Runtime}
-
-Table~\ref{tab:runtime} reports the median runtime and Table~\ref{tab:iqr} the IQR for
-all configurations. Figure~\ref{fig:time} shows the growth on a log-log scale; dotted
-lines show the cubic model $t \propto n^3$ anchored at each language's smallest
-measurable point. The C result at $n = 10$ is below the timer resolution and is omitted
-from the plots.
+The expected behaviour was written down from the theory of Section~2 before running the
+benchmarks. Table~\ref{tab:predictions} lists each prediction with the result used later
+to accept or reject it.
 
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabular}{rrrr}
+\begin{tabular}{p{2.2cm}p{5.2cm}p{4.0cm}p{2.6cm}}
+\toprule
+\textbf{Aspect} & \textbf{Prediction} & \textbf{Reason} & \textbf{Checked with} \\
+\midrule
+Runtime growth & Time proportional to $n^3$ in the three languages & The loop performs
+exactly $n^3$ multiply-adds & Fig.~\ref{fig:time}, fitted exponent \\
+\addlinespace
+Language ranking & C fastest, Java close to C, Python 10--100 times slower than C & Native
+code vs JIT-compiled code vs interpreter & Table~\ref{tab:perop} (ratio to C) \\
+\addlinespace
+Memory growth & Memory proportional to $n^2$ & Matrices have $n^2$ elements &
+Table~\ref{tab:memory} (bytes$/n^2$) \\
+\bottomrule
+\end{tabular}
+\caption{Hypotheses stated before the measurements and how each one is evaluated.}
+\label{tab:predictions}
+\end{table}
+
+\section{Background}
+
+\subsection{The triple-loop algorithm}
+
+Each element of the result is a dot product, $C[i][j] = \sum_k A[i][k] \cdot B[k][j]$.
+With $n^2$ elements and $n$ terms per element, the algorithm always performs $n^3$
+multiply-adds, independently of the values, and stores three $n \times n$
+matrices~\cite{cormen2009}. Algorithms with a lower asymptotic cost exist, but this
+assignment fixes the classical one.
+
+\subsection{Why the time per operation is not constant}
+
+The $n^3$ model assumes that every multiply-add costs the same. On real processors,
+reading data from a cache is much cheaper than reading it from main
+memory~\cite{hennessy2019}. With the \texttt{ijk} order, $A$ is read row by row, but $B$
+is read column by column, jumping $n$ elements between consecutive accesses. While the
+matrices fit in a cache level this is cheap; once they do not, many of these accesses
+miss the cache and each operation becomes slower~\cite{hennessy2019}. The
+i7-13700KF has 2~MB of L2 cache per performance core and 30~MB of shared L3.
+
+\subsection{How each language executes the loop}
+
+\begin{itemize}
+    \item \textbf{C} is translated to machine code before execution, so the loop runs
+    directly on the processor.
+    \item \textbf{Java} starts executing bytecode and the HotSpot virtual machine
+    compiles the most frequently executed methods to optimised machine code during the
+    run~\cite{oraclejvm}. Early executions are therefore slower, and measurements need
+    warm-up runs and repetitions.
+    \item \textbf{CPython} executes the bytecode with an interpreter, and every number is
+    a separate object with its own type information~\cite{pydatamodel}. Each multiply-add
+    therefore involves several interpreted instructions and the creation of a new float
+    object.
+\end{itemize}
+
+\section{Methodology}
+
+\subsection{Implementations and data layout}
+
+The three kernels follow the \texttt{ijk} order with 64-bit floating-point values
+(\texttt{double} in C and Java, \texttt{float} in Python), run on one thread and do not
+call any numerical library. The way each language stores a matrix cannot be made
+identical:
+\begin{itemize}
+    \item \textbf{C:} a single flat array of $n^2$ doubles, indexed as $i \cdot n + j$
+    (8 bytes per element, fully contiguous).
+    \item \textbf{Java:} \texttt{double[][]}, i.e.\ one array per row. Values are stored
+    as 8-byte doubles, but each row is a separate object, so reading \texttt{B[k][j]}
+    requires following a reference to row $k$ first.
+    \item \textbf{Python:} a list of lists. The inner lists hold references (8 bytes) to
+    float objects (24 bytes), about 32 bytes per element.
+\end{itemize}
+In Java and Python the result matrix is created inside the multiplication function, so
+its allocation is part of the measured time; in C it is allocated beforehand and only
+reset to zero, outside the timer. This adds O($n^2$) work against the O($n^3$) of the
+loop, and is negligible except for the smallest sizes.
+
+\subsection{Input data}
+
+To make the three languages multiply exactly the same matrices, the same
+pseudo-random generator, SplitMix64, was written in C, Java and Python with identical
+constants. Each 64-bit output is converted to a double in $[0, 10)$ by taking its upper
+53 bits, scaling by $2^{-53}$ and multiplying by 10; matrices are filled row by row, with
+seed 42 for $A$ and 43 for $B$. Every operation of this conversion is exact or correctly
+rounded in IEEE~754, so the generated values are bit-identical in the three languages.
+This was verified through the checksums described in Section~3.6.
+
+\subsection{Environment}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Item} & \textbf{Value} \\
+\midrule
+CPU        & Intel Core i7-13700KF (8 P-cores + 8 E-cores, 24 logical processors) \\
+Cache      & 2~MB L2 per P-core, 30~MB shared L3 \\
+RAM / OS   & 31.8~GB / Windows 11 Pro \\
+C          & gcc 16.1.0 (MSYS2/MinGW64), \texttt{-O2} \\
+Java       & OpenJDK 21.0.12 (Microsoft Build), default JIT and garbage collector \\
+Python     & CPython 3.11.9, standard library only \\
+Analysis   & NumPy 2.2 (reference results), pandas, matplotlib \\
+\bottomrule
+\end{tabular}
+\caption{Execution environment, identical for all runs (also saved automatically in
+\texttt{results/environment.txt}).}
+\label{tab:env}
+\end{table}
+
+No architecture-specific (\texttt{-march=native}) or fast-math flags were used for C. The
+kernels are single-threaded; the JVM still runs its own JIT-compiler and
+garbage-collector threads in the background, as in any normal Java execution.
+
+\subsection{Measurement protocol}
+
+A script (\texttt{run\_experiment.py}) compiles the C and Java programs and runs every
+configuration in a separate process, one language after another, so that no two
+benchmarks run at the same time.
+\begin{itemize}
+    \item \textbf{Sizes:} $n \in \{10, 50, 100, 200, 300, 500, 750, 1000, 1500, 2000,
+    3000\}$, declared before the run and identical for the three languages.
+    \item \textbf{Budget:} 15~minutes per individual run and 30~GB of memory. If a run
+    exceeds the time limit, the script stops the process, records the configuration as
+    TIMEOUT and does not run larger sizes for that language (SKIPPED). No time is
+    assigned to these configurations.
+    \item \textbf{What is timed:} only the call to the multiplication function; input
+    generation happens before the timer starts.
+    \item \textbf{Clocks:} all monotonic; C uses the Windows
+    \texttt{QueryPerformanceCounter} function, Java uses \texttt{System.nanoTime} and
+    Python uses \texttt{time.perf\_counter}. Times are stored in nanoseconds.
+    \item \textbf{Warm-up and repetitions:} 2 (C), 3 (Java) and 1 (Python) warm-up runs,
+    followed by 5 measured runs. Warm-up runs are kept in the raw data but excluded from
+    the statistics. Each configuration is summarised by the median and the interquartile
+    range (IQR).
+    \item \textbf{Result consumption:} after every run, each program computes the sum of
+    all elements of the result (checksum) and writes it with the measurement, so the
+    multiplication cannot be skipped by the compiler.
+\end{itemize}
+
+\subsection{Memory measurement}
+
+There is no single memory tool that works in the three languages, so each one uses its
+own metric:
+\begin{itemize}
+    \item \textbf{C:} size of the three allocated arrays, $3 \times 8n^2$ bytes
+    (computed from the allocation, not measured).
+    \item \textbf{Java:} increase of the used heap during the call,
+    \texttt{totalMemory()} minus \texttt{freeMemory()}, read after a \texttt{gc()}.
+    \item \textbf{Python:} peak traced by \texttt{tracemalloc}, started just before the
+    call.
+\end{itemize}
+Java and Python therefore see only the memory allocated inside the function, which is
+the result matrix. Because \texttt{tracemalloc} traces every allocation and slows the
+Python kernel down considerably, Python memory is measured in one additional run that
+is not used for timing, and only for $n \le 1000$, where that run still fits in the
+time budget.
+
+\subsection{Correctness}
+
+Validation was done in three steps before analysing the timings:
+\begin{enumerate}
+    \item \textbf{Exact cases.} Each program checks, at start-up, the product by the
+    identity matrix, by the zero matrix, and
+    [[1,2],[3,4]] $\times$ [[5,6],[7,8]] = [[19,22],[43,50]], with exact equality.
+    \item \textbf{Reference implementation.} For $n = 50$ and $n = 257$, each program
+    writes its full result matrix, which is compared element by element with NumPy's
+    \texttt{A @ B} computed on the same matrices. Since all inputs are non-negative,
+    the sums have no cancellation and their relative rounding error is bounded by about
+    $n u$, with $u = 2^{-53} \approx 1.1 \times 10^{-16}$~\cite{goldberg1991}: about
+    $3 \times 10^{-14}$ for $n = 257$ and $3 \times 10^{-13}$ for $n = 3000$. The
+    acceptance criterion is a relative error below $10^{-11}$ for every element, more
+    than 30 times above that bound, while an indexing error would produce relative errors
+    close to 1. No absolute tolerance is needed: every reference element is a sum of $n$
+    positive products, so none of them is close to zero.
+    \item \textbf{Checksums.} The checksum of every benchmark run is compared across
+    runs, across languages and with the checksum of NumPy's result for the same $n$.
+\end{enumerate}
+
+\section{Results}
+
+\subsection{Correctness}
+
+All validation steps passed (Table~\ref{tab:correctness}). The three implementations
+produced bit-identical result matrices, as expected since they execute the same
+operations in the same order on the same inputs. The checksum was identical in every run
+of every configuration and in the three languages, so all timed runs computed the
+correct product.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Test} & \textbf{Sizes} & \textbf{Largest deviation} & \textbf{Result} \\
+\midrule
+Identity, zero and $2 \times 2$ cases & 2 & exact & passed (all) \\
+Element-wise vs NumPy & 50, 257 & rel. error $1.9 \times 10^{-15}$ & passed (all) \\
+C = Java = Python, element-wise & 50, 257 & bit-identical & passed \\
+Checksums vs NumPy & all tested & rel. difference $1.2 \times 10^{-13}$ & passed (all) \\
+Checksums across runs and languages & all tested & bit-identical & passed \\
+\bottomrule
+\end{tabular}
+\caption{Correctness checks (tolerance: relative error $\le 10^{-11}$). Details in
+\texttt{results/correctness.csv} and \texttt{results/checksums.csv}.}
+\label{tab:correctness}
+\end{table}
+
+\subsection{Runtime}
+
+Table~\ref{tab:runtime} gives the median and IQR of the five measured runs of every
+configuration, Table~\ref{tab:perop} the time per multiply-add and the ratio to C, and
+Figures~\ref{fig:time} and~\ref{fig:costperop} show both quantities graphically.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{rlll}
 \toprule
 \textbf{n} & \textbf{C (s)} & \textbf{Java (s)} & \textbf{Python (s)} \\
 \midrule
-10   & $<$0.000001 & 0.000022 & 0.000202    \\
-50   & 0.000035    & 0.000140 & 0.028243    \\
-100  & 0.000309    & 0.000444 & 0.344134    \\
-200  & 0.002731    & 0.003165 & 1.801821    \\
-300  & 0.010202    & 0.013094 & 11.699590   \\
-500  & 0.048281    & 0.085622 & 58.140186   \\
-750  & 0.177874    & 0.365947 & 284.902533  \\
-1000 & 0.480131    & 0.989217 & 721.430916  \\
+10   & 0.0000003 (0.0000000) & 0.0000220 (0.0000006) & 0.0000522 (0.0000044) \\
+50   & 0.0000338 (0.0000010) & 0.0001015 (0.0001076) & 0.005667 (0.000084) \\
+100  & 0.0003077 (0.0000016) & 0.0004646 (0.0000346) & 0.04553 (0.00058) \\
+200  & 0.002734 (0.000042)   & 0.003250 (0.000024)   & 0.3747 (0.0019) \\
+300  & 0.009909 (0.000239)   & 0.01277 (0.00014)     & 1.312 (0.006) \\
+500  & 0.04691 (0.00058)     & 0.08651 (0.00109)     & 6.720 (0.002) \\
+750  & 0.1756 (0.0022)       & 0.3689 (0.0010)       & 25.42 (0.08) \\
+1000 & 0.4729 (0.0021)       & 0.7520 (0.0050)       & 72.32 (0.39) \\
+1500 & 1.936 (0.008)         & 10.50 (0.05)          & 317.4 (0.5) \\
+2000 & 11.10 (0.06)          & 30.75 (0.06)          & 838.0 (2.6) \\
+3000 & 73.81 (0.26)          & 125.9 (0.5)           & TIMEOUT \\
 \bottomrule
 \end{tabular}
-\caption{Median runtime (seconds) over 5 repetitions per configuration.}
+\caption{Median kernel time in seconds, with the IQR in parentheses (5 measured runs per
+configuration, warm-ups excluded).}
 \label{tab:runtime}
 \end{table}
 
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabular}{rrrr}
+\begin{tabular}{rrrrrr}
 \toprule
-\textbf{n} & \textbf{C IQR (s)} & \textbf{Java IQR (s)} & \textbf{Python IQR (s)} \\
+\textbf{n} & \textbf{C (ns)} & \textbf{Java (ns)} & \textbf{Python (ns)}
+& \textbf{Java / C} & \textbf{Python / C} \\
 \midrule
-50   & 0.000003    & 0.000095 & 0.000358  \\
-100  & 0.000151    & 0.000008 & 0.000714  \\
-200  & 0.000006    & 0.000067 & 0.015807  \\
-300  & 0.000133    & 0.000248 & 0.026359  \\
-500  & 0.000307    & 0.000559 & 0.380738  \\
-750  & 0.000321    & 0.001647 & 0.958414  \\
-1000 & 0.001999    & 0.051162 & 1.752245  \\
+10   & 0.30 & 22.0 & 52.2  & 73  & 174 \\
+50   & 0.27 & 0.81 & 45.3  & 3.0 & 168 \\
+100  & 0.31 & 0.46 & 45.5  & 1.5 & 148 \\
+200  & 0.34 & 0.41 & 46.8  & 1.2 & 137 \\
+300  & 0.37 & 0.47 & 48.6  & 1.3 & 132 \\
+500  & 0.38 & 0.69 & 53.8  & 1.8 & 143 \\
+750  & 0.42 & 0.87 & 60.3  & 2.1 & 145 \\
+1000 & 0.47 & 0.75 & 72.3  & 1.6 & 153 \\
+1500 & 0.57 & 3.11 & 94.0  & 5.4 & 164 \\
+2000 & 1.39 & 3.84 & 104.7 & 2.8 & 75 \\
+3000 & 2.73 & 4.66 & ---   & 1.7 & --- \\
 \bottomrule
 \end{tabular}
-\caption{IQR of runtime (seconds) over 5 repetitions per configuration.}
-\label{tab:iqr}
+\caption{Time per multiply-add (median time $/ n^3$, in nanoseconds) and median runtime
+relative to C at the same $n$.}
+\label{tab:perop}
 \end{table}
+
+Variability is low: for every configuration whose median exceeds 1~ms, the IQR is at
+most 2.4\% of the median. Only some of the shortest runs are noisy, in particular Java at
+$n = 50$ (IQR 106\% of the median). A least-squares fit of $\log t$ against $\log n$
+gives growth exponents of 3.17 (C), 3.31 (Java) and 3.19 (Python) for
+$100 \le n \le 1000$, and 4.69 (C), 4.60 (Java) and 3.54 (Python) for $n \ge 1000$.
+When $n$ doubles from 100 to 200, the time grows by a factor of 8.9 (C), 7.0 (Java) and
+8.2 (Python), against 8 predicted; from 1000 to 2000 it grows by 23.5 (C), 40.9 (Java)
+and 11.6 (Python).
+
+For Java, the first warm-up run was clearly slower than the measured runs at small sizes
+(13 times the median at $n = 50$ and 6 times at $n = 100$), and within 10\% of the median
+from $n = 500$. For Python, the memory run with \texttt{tracemalloc} took 4.7--11 times longer
+than the median timed run for $n \ge 100$.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.75\textwidth]{../results/plot_time.png}
     \caption{Median runtime vs matrix size $n$ (log-log scale). Dotted lines show the
-    cubic model $t \propto n^3$ anchored at each language's first measurable point.
-    Error bars show IQR.}
+    cubic model $t \propto n^3$ anchored at each language's smallest size. Error bars
+    show the IQR (mostly smaller than the markers).}
     \label{fig:time}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.75\textwidth]{../results/plot_cost_per_op.png}
-    \caption{Median time divided by $n^3$ (nanoseconds per multiply-add). A flat line
-    indicates perfect cubic scaling; an upward trend reveals when cache pressure makes
-    each operation more expensive.}
+    \caption{Median time divided by $n^3$ (nanoseconds per multiply-add). If the runtime
+    were exactly proportional to $n^3$, each line would be horizontal.}
     \label{fig:costperop}
 \end{figure}
 
-\subsection*{Memory}
+\subsection{Memory}
+
+Table~\ref{tab:memory} gives the median memory of each configuration, measured as
+described in Section~3.5, and Figure~\ref{fig:memory} shows its growth with $n$.
 
 \begin{table}[htbp]
 \centering
@@ -232,14 +425,19 @@ from the plots.
 \toprule
 \textbf{n} & \textbf{C (KB)} & \textbf{Java (KB)} & \textbf{Python (KB)} \\
 \midrule
-10   & 2.3      & 41.6   & 1.2     \\
-100  & 234.4    & 86.9   & 312.5   \\
-300  & 2109.4   & 747.8  & 2825.1  \\
-500  & 5859.4   & 2008.4 & 7837.7  \\
-1000 & 23437.5  & 7952.3 & 31307.1 \\
+10   & 2.3      & 8.7     & 1.1     \\
+100  & 234.4    & 92.5    & 312.4   \\
+500  & 5859.4   & 2011.1  & 7837.7  \\
+1000 & 23437.5  & 8187.8  & 31307.0 \\
+2000 & 93750.0  & 31983.5 & ---     \\
+3000 & 210937.5 & 71547.1 & ---     \\
+\midrule
+\textit{Bytes / $n^2$} & 24.0 & 8.1--8.4 & 32.0--32.2 \\
 \bottomrule
 \end{tabular}
-\caption{Median memory usage (KB). Metrics differ across languages; see Section~3.}
+\caption{Median memory (KB $= 1024$ bytes). C: three matrices. Java and Python: memory
+allocated during the multiplication (result matrix). Python memory is measured for
+$n \le 1000$. The last row gives the range of bytes per element for $n \ge 200$.}
 \label{tab:memory}
 \end{table}
 
@@ -247,99 +445,224 @@ from the plots.
     \centering
     \includegraphics[width=0.75\textwidth]{../results/plot_memory.png}
     \caption{Memory usage vs matrix size $n$ (log-log scale). The dashed line shows the
-    raw storage of three float64 matrices ($3n^2 \times 8$~bytes).}
+    raw storage of three float64 matrices ($3 \times 8n^2$ bytes), which coincides with
+    the C values.}
     \label{fig:memory}
 \end{figure}
 
+\FloatBarrier
+\subsection{Largest feasible size}
+
+Table~\ref{tab:limits} shows, for each language, the largest matrix size that finished
+within the 15-minute budget per run and the first size that exceeded it.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Language} & \textbf{Largest feasible $n$} & \textbf{Longest run} &
+\textbf{First size over budget} \\
+\midrule
+C      & 3000 & 74~s ($n = 3000$)  & none \\
+Java   & 3000 & 126~s ($n = 3000$) & none \\
+Python & 2000 & 841~s ($n = 2000$) & 3000 (TIMEOUT at 900~s) \\
+\bottomrule
+\end{tabular}
+\caption{Limits under the 15-minute-per-run budget (\texttt{results/run\_status.csv}).
+The largest size attempted was $n = 3000$ for all three languages. No configuration
+came close to the memory budget: the largest value was 206~MiB (C, $n = 3000$).}
+\label{tab:limits}
+\end{table}
+
+\FloatBarrier
 \section{Discussion}
 
-\textbf{Cubic growth.}
-All three implementations exhibit clear cubic growth. From $n = 100$ to $n = 200$
-(factor of 2), runtimes multiply by approximately 8 ($2^3$), consistent with O($n^3$).
-Figure~\ref{fig:costperop} shows the cost per inner-loop operation (median time divided
-by $n^3$): a flat line would indicate perfect cubic scaling. For all three languages the
-cost per operation rises at large $n$, consistent with cache pressure as the working set
-exceeds the L2/L3 cache.
+\subsection{Evaluation of the hypotheses}
 
-\textbf{C is the fastest.}
-C compiled with \texttt{-O2} is the fastest implementation at every tested size. At
-$n = 1000$, Java takes approximately $2\times$ as long as C, and Python takes
-approximately 1500$\times$ as long. The gap between C and Java is explained by the
-difference in storage layout: Java's \texttt{double[][]} stores each row as a separate
-heap object, so the inner loop accessing column~$j$ of~$B$ must first load a row
-reference, adding an indirection that C's contiguous flat array avoids.
+In answer to the research question: memory grows as $n^2$ in the three languages, and
+runtime grows as $n^3$ only while the matrices fit in the cache; beyond that size the
+time per operation increases and the growth is steeper. The language changes the
+runtime by a large factor (Python 75--175 times slower than C), but this factor is not
+fixed: the Java--C gap in particular depends on $n$.
 
-\textbf{Python overhead.}
-Python is approximately 1500$\times$ slower than C and 730$\times$ slower than Java at
-$n = 1000$. CPython interprets each bytecode instruction individually, performs dynamic
-type checks on every operation, and represents numbers as heap-allocated objects.
-These overheads dominate the inner loop and explain the large constant factor relative
-to compiled implementations.
+Table~\ref{tab:verdicts} compares each prediction of Table~\ref{tab:predictions} with the
+measurements; the following subsections explain the deviations.
 
-\textbf{Memory.}
-Memory scales as O($n^2$) in all three cases, consistent with storing three $n \times n$
-matrices. The different measurement methods produce different absolute values: C reports
-exact allocated storage, while Python and Java include object headers and runtime
-overhead. These metrics should not be compared as if identical.
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{2.2cm}p{8.0cm}>{\raggedright\arraybackslash}p{3.0cm}}
+\toprule
+\textbf{Hypothesis} & \textbf{Observed} & \textbf{Verdict} \\
+\midrule
+Runtime $\propto n^3$ & Exponents 3.17--3.31 for $100 \le n \le 1000$; from
+$n = 1500$ C and Java grow much faster (exponents 4.6--4.7) & Partly confirmed
+(only up to $n = 1000$) \\
+\addlinespace
+Language ranking & Order C $<$ Java $<$ Python at every size. Java 1.2--2.1 times C up
+to $n = 1000$, but 5.4 at $n = 1500$. Python 130--175 times C, above the predicted
+10--100 & Partly confirmed (order correct, gaps not) \\
+\addlinespace
+Memory $\propto n^2$ & Bytes$/n^2$ constant in each language for $n \ge 200$ (24.0,
+8.1--8.4 and 32.0--32.2~B) & Confirmed \\
+\bottomrule
+\end{tabular}
+\caption{Verdict for each hypothesis of Table~\ref{tab:predictions}.}
+\label{tab:verdicts}
+\end{table}
 
-\textbf{Limitations.}
-Cross-language PRNG differences mean input matrices are statistically similar but not
-bit-identical. The Java memory metric is approximate due to GC activity. The C timer
-resolution is insufficient to measure $n = 10$ (result below 1~$\mu$s). Results are
-specific to the tested hardware, OS and language versions.
+\subsection{Growth with matrix size}
+
+The cubic prediction of Table~\ref{tab:predictions} holds only while the matrices fit in
+the cache. For $100 \le n \le 1000$ the three implementations grow with exponents between
+3.17 and 3.31, and doubling $n$ multiplies the time by 7.0--8.9, close to the factor of 8
+of the model. Beyond $n = 1000$ the compiled versions depart strongly from it: from
+$n = 1000$ to $2000$ the C time grows 23.5 times and the Java time 40.9 times. The number
+of operations still follows $n^3$ exactly, so this extra growth comes from each operation
+becoming more expensive, which the $n^3$ model does not capture.
+
+The point where this happens is consistent with the cache sizes. Three matrices of
+doubles occupy $24n^2$ bytes: 24~MB at $n = 1000$, which still fits in the 30~MB L3
+cache, and 54~MB at $n = 1500$, which does not. In C the cost per operation stays between
+0.27 and 0.47~ns up to $n = 1000$ and then rises to 0.57, 1.39 and 2.73~ns at $n = 1500$,
+2000 and 3000 (Figure~\ref{fig:costperop}). At these sizes, consecutive accesses to a
+column of $B$ are $8n$ bytes apart (16~KB at $n = 2000$), so almost every access needs a
+new cache line from main memory~\cite{hennessy2019}. This explanation agrees
+with the measurements, but cache misses were not measured with hardware counters, so it
+remains a hypothesis.
+
+At small sizes the cubic model does not describe Java either: at $n = 10$ one
+multiply-add costs 22~ns, and the first warm-up run at $n = 100$ was six times slower
+than the measured median. Both are consistent with fixed overheads and with code that
+the JIT compiler has not yet optimised~\cite{oraclejvm}.
+
+\subsection{Differences between languages}
+
+The predicted ranking is correct at every size: C is the fastest, followed by Java and
+then Python. The size of the gaps, however, depends on $n$, so no single factor
+describes them.
+
+\textit{Java vs C.} For $100 \le n \le 1000$ Java needs 1.2--2.1 times the C time: once
+the loop is compiled, both execute native code, as predicted. At $n = 1500$ the gap
+jumps to 5.4, because the cost per operation of Java grows from 0.75 to 3.11~ns while
+that of C grows only from 0.47 to 0.57~ns. Both store 8-byte doubles, so the amount of
+data is the same; the most likely difference is how $B$ is stored. In C, the address of
+$B[k][j]$ is computed directly from $k$ and $j$ inside one flat array. In Java, every
+step of the inner loop first reads the reference of row $k$ from the outer array and only
+then the value, so each operation needs one extra memory access, and the row arrays may
+be spread over the heap~\cite{hennessy2019}.
+For larger sizes the gap narrows again (1.7 at $n = 3000$), because C also becomes
+limited by main memory. The experiment cannot separate the layout from other JIT effects
+such as bounds checks; this question is left for Assignment~2. The small drop of the Java
+cost per operation at $n = 1000$ (0.75~ns against 0.87~ns at $n = 750$) is not explained
+by these data.
+
+\textit{Python vs C.} Python needs 130--175 times the C time up to $n = 1500$. This is
+above the predicted range of 10--100, so the prediction is only partly confirmed: the
+ranking is right, but the interpreter overhead was underestimated. CPython spends about
+45~ns per multiply-add even for small matrices, against 0.3~ns in C, because each
+operation goes through the interpreter, checks the types of its operands and creates a
+new float object~\cite{pydatamodel}. This fixed cost dominates at every size; Python's
+cost per operation increases only gradually with $n$ (45 to 105~ns), and the Python/C
+ratio drops to 75 at $n = 2000$ only because C slows down, not because Python gets
+faster.
+
+\subsection{Memory}
+
+The quadratic growth is confirmed: the memory divided by $n^2$ is practically constant in
+each language (24.0~B in C, 8.1--8.4~B in Java and 32.0--32.2~B in Python for
+$n \ge 200$). The absolute values are not comparable, because C counts three matrices and
+Java and Python only the result. Comparing the same object, the result matrix, Python
+needs 32 bytes per element against 8 in Java and C, i.e.\ four times more, because of the
+reference plus the float object. The Java values for $n \le 50$ are dominated by
+allocation buffers and the garbage collector and are not meaningful. The largest memory
+value, 206~MiB, is far below the 30~GB budget; the only limit reached in the experiment
+was the time limit.
+
+\subsection{Limitations}
+
+\begin{itemize}
+    \item The study uses a single computer, operating system and set of language
+    versions; other hardware, in particular other cache sizes, would move the points
+    where the cost per operation increases.
+    \item Five repetitions per configuration give only a rough estimate of variability,
+    and runs shorter than about 0.1~ms are only a few ticks of the clock.
+    \item The memory metric is different in each language, approximate in Java because
+    of garbage collection, and available for Python only up to $n = 1000$.
+    \item The explanations based on the cache and on the Java row layout are inferred
+    from the timings only.
+    \item The declared size sequence ended at $n = 3000$, where C and Java still ran far
+    below the budget (74~s and 126~s per run). Their actual largest feasible size is
+    therefore larger and was not determined.
+\end{itemize}
 
 \section{Conclusions}
 
-All three implementations exhibit the expected O($n^3$) runtime growth. Under the tested
-conditions — each language in its standard execution environment — C (\texttt{-O2})
-achieves the lowest execution time, followed by Java (JIT), then Python. Python's
-interpreter overhead makes it unsuitable for large-scale naive matrix multiplication
-without vectorised libraries. Memory usage scales quadratically in all cases, with
-differences in absolute values explained by the measurement method.
-
-These conclusions apply strictly to the tested implementation, hardware and settings.
-Cache blocking, loop reordering and further compiler optimisations will be explored in
-Assignment~2.
-
-\section*{Generative AI Disclosure}
-
-\textbf{Tool:} Claude Code (Claude Sonnet 4.6, Anthropic).
-
-\textbf{Purpose and affected parts:}
+For the three implementations and the conditions described in Section~3:
 \begin{itemize}
-    \item \textit{Planning and structure} — the experimental plan and project organisation
-    were designed with AI assistance.
-    \item \textit{Implementation scaffolding} — the structure of the Python, Java and C
-    benchmark files (timing harness, CSV output, warm-up loop) was generated with AI
-    support and reviewed and validated by the author.
-    \item \textit{Debugging} — AI assistance identified and fixed two issues: a Java locale
-    bug producing malformed CSV output, and the unavailability of \texttt{timespec\_get}
-    in MinGW, replaced with \texttt{QueryPerformanceCounter}.
-    \item \textit{Analysis script} — the Python plotting script was generated with AI
-    support and reviewed by the author.
-    \item \textit{Report drafting and language revision} — the structure and initial text
-    of this report were produced with AI assistance. All technical claims, measurements
-    and conclusions were verified by the author.
+    \item Up to $n = 1000$ the runtime agrees with the $n^3$ model (exponents 3.2--3.3).
+    From $n = 1500$, once the three matrices exceed the L3 cache, C and Java become much
+    slower than the model predicts (exponents 4.6--4.7), so the cost of an operation
+    depends on the matrix size and not only on the number of operations.
+    \item C is the fastest at every size. Java needs 1.2--2.1 times the C time up to
+    $n = 1000$, up to 5.4 times at $n = 1500$, and 1.7 times at $n = 3000$. Python needs
+    130--175 times the C time up to $n = 1500$, more than predicted.
+    \item Memory grows as $n^2$; for the same result matrix Python uses four times more
+    memory than Java or C.
+    \item Under the 15-minute budget, C and Java completed every declared size up to
+    $n = 3000$, and Python up to $n = 2000$.
 \end{itemize}
+These results compare specific implementations on one machine; they are not a general
+ranking of programming languages. Two questions remain open: whether the jump in the cost
+per operation is caused by cache and memory-access effects, and how much of the Java--C
+gap comes from the \texttt{double[][]} layout. Both are natural starting points for the
+loop-reordering and blocking optimisations~\cite{hennessy2019} of Assignment~2.
 
-\textbf{Author's responsibility:} The author understands all implementation code,
-validated the correctness checks, verified that the raw measurements are consistent with
-the expected O($n^3$) behaviour, and is able to reproduce and defend every experiment
-described in this report.
+\section*{Reproducibility materials}
 
-\section*{References and Materials}
+All materials are in the repository linked on the first page: the
+source code, the build and run commands (\texttt{README.md}), the raw measurements of
+every run (\texttt{results/raw\_measurements.csv}), the status of every configuration
+(\texttt{results/run\_status.csv}), the correctness results and the analysis scripts.
+The whole study is reproduced with \texttt{run\_experiment.py},
+\texttt{analysis/check\_correctness.py} and \texttt{analysis/plot\_results.py}.
 
-\begin{itemize}
-    \item Source code, raw measurements (CSV), analysis scripts and plots:\\
-    \url{https://github.com/Cafabri/Assigment1}
-    \item Python Software Foundation. \textit{Python 3.11 documentation}.
-    \url{https://docs.python.org/3.11/}
-    \item Oracle. \textit{Java SE 21 Documentation}.
-    \url{https://docs.oracle.com/en/java/javase/21/}
-    \item Free Software Foundation. \textit{GCC 16 Manual}.
-    \url{https://gcc.gnu.org/onlinedocs/}
-    \item Cormen, T.H., Leiserson, C.E., Rivest, R.L., \& Stein, C. (2009).
-    \textit{Introduction to Algorithms} (3rd ed.). MIT Press.
-\end{itemize}
+\section*{Use of generative AI}
+
+Claude Sonnet 4.6 and Claude Opus 5.5 (Anthropic), used through Claude Code, served as
+support tools during this assignment: to help write and debug parts of the benchmark and
+analysis scripts, and to improve the structure and wording of the report. All the
+measurements come from running the code on the machine described above. The author
+reviewed the code and the AI-generated text, checked the numbers against the raw data and
+the references, and is responsible for the conclusions.
+
+\begin{thebibliography}{5}
+
+\bibitem{cormen2009}
+T.~H. Cormen, C.~E. Leiserson, R.~L. Rivest, and C.~Stein, \textit{Introduction to
+Algorithms}, 3rd~ed. Cambridge, MA, USA: MIT Press, 2009.
+
+\bibitem{hennessy2019}
+J.~L. Hennessy and D.~A. Patterson, \textit{Computer Architecture: A Quantitative
+Approach}, 6th~ed. Cambridge, MA, USA: Morgan Kaufmann, 2019.
+
+\bibitem{oraclejvm}
+Oracle, ``Java HotSpot virtual machine performance enhancements,'' in \textit{Java
+Virtual Machine Guide, Release~21}. [Online]. Available:
+\url{https://docs.oracle.com/en/java/javase/21/vm/java-hotspot-virtual-machine-performance-enhancements.html}
+(accessed Oct.~15, 2026).
+
+\bibitem{pydatamodel}
+Python Software Foundation, ``Data model,'' in \textit{The Python Language Reference},
+Python~3.11 documentation. [Online]. Available:
+\url{https://docs.python.org/3.11/reference/datamodel.html} (accessed Oct.~14, 2026).
+
+\bibitem{goldberg1991}
+D.~Goldberg, ``What every computer scientist should know about floating-point
+arithmetic,'' \textit{ACM Comput. Surv.}, vol.~23, no.~1, pp.~5--48, Mar. 1991,
+doi: 10.1145/103162.103163.
+
+\end{thebibliography}
 
 \end{document}
